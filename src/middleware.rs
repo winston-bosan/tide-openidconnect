@@ -294,7 +294,7 @@ impl OpenIdConnectMiddleware {
         {
             // Extract the OpenID callback information and verify the CSRF
             // state.
-            #[derive(Deserialize)]
+            #[derive(Deserialize, Debug)]
             struct OpenIdCallback {
                 code: AuthorizationCode,
                 state: String,
