@@ -1,7 +1,7 @@
 use openidconnect::{AdditionalClaims, EmptyExtraTokenFields, IdTokenFields, StandardErrorResponse, StandardTokenResponse};
 use openidconnect::core::{CoreAuthDisplay, CoreAuthPrompt, CoreErrorResponseType, CoreGenderClaim, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm, CoreJwsSigningAlgorithm, CoreRevocableToken, CoreRevocationErrorResponse, CoreTokenIntrospectionResponse, CoreTokenType};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, Error as JsonError};
 
 /// Implementing the trait to make use of our custom claim in the type params
 impl AdditionalClaims for Auth0Claims {}
@@ -13,13 +13,24 @@ pub struct Auth0Claims {
     app_metadata: Value,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AppMetadata {
     pub user_linked_stripe_id: String,
 }
 
 impl Auth0Claims {
-    fn deserialize_to(&self) -> AppMetadata{
-        todo!()
+    pub fn deserialize_to(&self) -> Result<AppMetadata, serde_json::Error> {
+        serde_json::from_value(self.app_metadata.clone())
+            .map_err(|e| {
+                eprintln!("Failed to deserialize app_metadata: {}", e);
+                e
+            })
+    }
+}
+
+impl AppMetadata {
+    pub fn new(user_linked_stripe_id: String) -> Self {
+        Self { user_linked_stripe_id }
     }
 }
 
