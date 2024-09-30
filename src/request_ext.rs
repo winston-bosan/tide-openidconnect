@@ -70,7 +70,7 @@ where
     fn provider_app_metadata(&self) -> Option<AppMetadata> {
         match self.auth_state() {
             OpenIdConnectRequestExtData::Authenticated { auth0claims, .. } => {
-                auth0claims.deserialize_to().ok()
+                Some(auth0claims.deserialize_to().ok()?.app_metadata)
             }
             OpenIdConnectRequestExtData::Unauthenticated { .. } => None
         }
