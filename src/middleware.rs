@@ -310,6 +310,11 @@ impl OpenIdConnectMiddleware {
                 .await
                 .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
 
+            // TODO: Something to check for app_metadata and user_metadata
+            // Assume auth0 terminology:
+            // user_metadata: Data that the user has read/write access to (e.g. color_preference, blog_url, etc.
+            // app_metadata: Data that the user has read-only access to (e.g. roles, permissions, vip, etc)
+
             // Get the claims and verify the nonce.
             let claims = token_response
                 .extra_fields()
@@ -397,8 +402,10 @@ where
                 Some(MiddlewareSessionState::PostAuth(subject, access_token, scopes)) => req
                     .set_ext(OpenIdConnectRequestExtData::Authenticated {
                         user_id: subject.to_string(),
+                        app_metadata: Default::default(),
                         access_token: access_token.secret().to_string(),
                         scopes: scopes.iter().map(|s| s.to_string()).collect(),
+                        user_metadata: Default::default(),
                     }),
                 _ => req.set_ext(OpenIdConnectRequestExtData::Unauthenticated {
                     redirect_strategy: self.redirect_strategy.clone(),
