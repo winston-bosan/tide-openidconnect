@@ -1,17 +1,18 @@
 use std::sync::Arc;
 
+use crate::claims::{Auth0Claims, Auto0Client};
 use crate::isahc::http_client;
 use crate::redirect_strategy::{HttpRedirect, RedirectStrategy};
 use crate::request_ext::OpenIdConnectRequestExtData;
+use openidconnect::core::CoreGenderClaim;
 use openidconnect::{
-    core::{CoreClient, CoreProviderMetadata, CoreResponseType, CoreIdTokenClaims},
+    core::{CoreClient, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType},
     AccessToken, AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    IssuerUrl, Nonce, OAuth2TokenResponse, RedirectUrl, Scope, SubjectIdentifier,
+    IdTokenClaims, IssuerUrl, Nonce, OAuth2TokenResponse, RedirectUrl, Scope, SubjectIdentifier,
 };
-use serde_json::Value;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tide::{http::Method, Middleware, Next, Redirect, Request, StatusCode};
-use crate::claims::Auto0Client;
 
 const SESSION_KEY: &str = "tide.oidc";
 
@@ -59,7 +60,7 @@ pub struct Config {
 #[derive(Debug, Deserialize, Serialize)]
 enum MiddlewareSessionState {
     PreAuth(CsrfToken, Nonce),
-    PostAuth(SubjectIdentifier, AccessToken, Vec<Scope>, Value, Value),
+    PostAuth(SubjectIdentifier, AccessToken, Vec<Scope>, Auth0Claims),
 }
 
 /// Open ID Connect Middleware.
@@ -141,7 +142,7 @@ impl OpenIdConnectMiddleware {
                 .expect("Unable to load OpenID Connect provider metadata.");
 
         // Create the OpenID Connect client.
-        let client = CoreClient::from_provider_metadata(
+        let client = Auto0Client::from_provider_metadata(
             provider_metadata,
             config.client_id.clone(),
             Some(config.client_secret.clone()),
@@ -318,17 +319,14 @@ impl OpenIdConnectMiddleware {
             // app_metadata: Data that the user has read-only access to (e.g. roles, permissions, vip, etc)
 
             // Get the claims and verify the nonce.
-            let id_token = token_response
-                .extra_fields()
-                .id_token()
-                .ok_or_else(|| {
-                    tide::http::Error::from_str(
-                        StatusCode::InternalServerError,
-                        "OpenID Connect server did not return an ID token.",
-                    )
-                })?;
+            let id_token = token_response.extra_fields().id_token().ok_or_else(|| {
+                tide::http::Error::from_str(
+                    StatusCode::InternalServerError,
+                    "OpenID Connect server did not return an ID token.",
+                )
+            })?;
 
-            let claims: &CoreIdTokenClaims = id_token
+            let claims: &IdTokenClaims<Auth0Claims, CoreGenderClaim> = id_token
                 .claims(&self.client.id_token_verifier(), &nonce)
                 .map_err(|error| tide::http::Error::new(StatusCode::Unauthorized, error))?;
 
@@ -341,8 +339,7 @@ impl OpenIdConnectMiddleware {
                         claims.subject().clone(),
                         token_response.access_token().clone(),
                         token_response.scopes().unwrap_or(&self.scopes).clone(),
-                        auth0_claims.app_metadata,
-                        auth0_claims.user_metadata,
+                        claims.additional_claims().clone(),
                     ),
                 )
                 .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
@@ -405,14 +402,17 @@ where
             // process), then augment the request with the authentication
             // status.
             match req.session().get(SESSION_KEY) {
-                Some(MiddlewareSessionState::PostAuth(subject, access_token, scopes, app_metadata, user_metadata)) => req
-                    .set_ext(OpenIdConnectRequestExtData::Authenticated {
-                        user_id: subject.to_string(),
-                        app_metadata,
-                        access_token: access_token.secret().to_string(),
-                        scopes: scopes.iter().map(|s| s.to_string()).collect(),
-                        user_metadata,
-                    }),
+                Some(MiddlewareSessionState::PostAuth(
+                    subject,
+                    access_token,
+                    scopes,
+                    auth0_data,
+                )) => req.set_ext(OpenIdConnectRequestExtData::Authenticated {
+                    user_id: subject.to_string(),
+                    access_token: access_token.secret().to_string(),
+                    scopes: scopes.iter().map(|s| s.to_string()).collect(),
+                    auth0claims: auth0_data,
+                }),
                 _ => req.set_ext(OpenIdConnectRequestExtData::Unauthenticated {
                     redirect_strategy: self.redirect_strategy.clone(),
                 }),

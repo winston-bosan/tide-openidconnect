@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use crate::redirect_strategy::RedirectStrategy;
 use tide::Request;
+use crate::claims::Auth0Claims;
 
 /// Provides access to request-level authentication data.
 pub trait OpenIdConnectRequestExt {
@@ -61,7 +62,12 @@ where
     }
 
     fn provider_app_metadata(&self) -> Option<HashMap<String, String>> {
-        todo!()
+        match self.auth_state() {
+            OpenIdConnectRequestExtData::Authenticated { auth0claims, .. } => {
+                todo!()
+            }
+            OpenIdConnectRequestExtData::Unauthenticated { .. } => None
+        }
     }
 
     fn user_app_metadata(&self) -> Option<HashMap<String, String>> {
@@ -77,8 +83,7 @@ pub(crate) enum OpenIdConnectRequestExtData {
         access_token: String,
         scopes: Vec<String>,
         user_id: String,
-        app_metadata: HashMap<String, String>,
-        user_metadata: HashMap<String, String>,
+        auth0claims: Auth0Claims,
     },
 }
 
