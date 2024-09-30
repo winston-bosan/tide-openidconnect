@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-
+use serde::Serialize;
 use crate::redirect_strategy::RedirectStrategy;
 use tide::Request;
-use crate::claims::Auth0Claims;
+use crate::claims::{AppMetadata, Auth0Claims};
+
+/// TEST
 
 /// Provides access to request-level authentication data.
 pub trait OpenIdConnectRequestExt {
@@ -23,7 +25,11 @@ pub trait OpenIdConnectRequestExt {
     /// Gets the Identity Provider-specific user id of the authenticated
     /// user, or `None` if the session has not been authenticated.
     fn user_id(&self) -> Option<String>;
-    fn provider_app_metadata(&self) -> Option<HashMap<String, String>>;
+    /// Seeing that this crate uses the auth0claim by default,
+    /// this method gets the app_metadata claim that is essential for
+    /// things like stripe integration and stuff
+    fn provider_app_metadata(&self) -> Option<AppMetadata>;
+    /// Same as above but for users
     fn user_app_metadata(&self) -> Option<HashMap<String, String>>;
 }
 
@@ -61,10 +67,10 @@ where
         }
     }
 
-    fn provider_app_metadata(&self) -> Option<HashMap<String, String>> {
+    fn provider_app_metadata(&self) -> Option<AppMetadata> {
         match self.auth_state() {
             OpenIdConnectRequestExtData::Authenticated { auth0claims, .. } => {
-                todo!()
+                auth0claims.deserialize_to().ok()
             }
             OpenIdConnectRequestExtData::Unauthenticated { .. } => None
         }

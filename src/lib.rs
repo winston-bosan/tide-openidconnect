@@ -3,7 +3,7 @@
 #![deny(
     missing_debug_implementations,
     nonstandard_style,
-    missing_docs,
+    // missing_docs,
     unreachable_pub,
     missing_copy_implementations,
     unused_qualifications,
@@ -11,12 +11,12 @@
     clippy::unwrap_used
 )]
 
+pub mod claims;
 mod isahc;
 mod middleware;
 pub mod redirect_strategy;
 mod request_ext;
 mod route_ext;
-pub mod claims;
 pub use crate::middleware::Config;
 pub use crate::middleware::OpenIdConnectMiddleware;
 pub use crate::request_ext::OpenIdConnectRequestExt;
