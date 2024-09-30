@@ -13,6 +13,7 @@ pub struct Auth0Claims {
     app_metadata: Value,
 }
 
+// The concrete type the JSON is going to populate/deserialize into
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AppMetadata {
     pub user_linked_stripe_id: String,
