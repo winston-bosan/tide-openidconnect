@@ -241,7 +241,7 @@ impl OpenIdConnectMiddleware {
     /// Sets the trait used to generate redirect responses to
     /// unauthenticated requests.
     ///
-    /// Defaults to [`HttpRedirect`](crate::redirect_strategy::HttpRedirect)
+    /// Defaults to [`HttpRedirect`](HttpRedirect)
     pub fn with_unauthenticated_redirect_strategy<R>(mut self, redirect_strategy: R) -> Self
     where
         R: RedirectStrategy + 'static,
@@ -329,6 +329,7 @@ impl OpenIdConnectMiddleware {
             let claims: &IdTokenClaims<Auth0Claims, CoreGenderClaim> = id_token
                 .claims(&self.client.id_token_verifier(), &nonce)
                 .map_err(|error| tide::http::Error::new(StatusCode::Unauthorized, error))?;
+
 
             // Add the user id and metadata to the session state in order to mark this
             // session as authenticated.
