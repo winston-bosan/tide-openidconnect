@@ -12,8 +12,8 @@ impl AdditionalClaims for Auth0Claims {}
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Auth0Claims {
     /// App metadata from Auth0, stored as a JSON Value
-    #[serde(alias = "https://dev-nfphi5c8x1gke8yg.us.auth0.com/app_metadata")]
     app_metadata: Value,
+    my_claim: Option<Value>
 }
 
 /// The concrete type the JSON is going to populate/deserialize into
