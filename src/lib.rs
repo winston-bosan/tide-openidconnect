@@ -16,6 +16,8 @@ mod middleware;
 pub mod redirect_strategy;
 mod request_ext;
 mod route_ext;
+pub mod claims;
+pub mod custom_client;
 
 pub use crate::middleware::Config;
 pub use crate::middleware::OpenIdConnectMiddleware;

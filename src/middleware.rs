@@ -11,6 +11,7 @@ use openidconnect::{
 use serde_json::Value;
 use serde::{Deserialize, Serialize};
 use tide::{http::Method, Middleware, Next, Redirect, Request, StatusCode};
+use crate::claims::Auto0Client;
 
 const SESSION_KEY: &str = "tide.oidc";
 
@@ -61,14 +62,6 @@ enum MiddlewareSessionState {
     PostAuth(SubjectIdentifier, AccessToken, Vec<Scope>, Value, Value),
 }
 
-#[derive(Debug, Deserialize)]
-struct Auth0Claims {
-    #[serde(rename = "https://your-namespace.com/app_metadata")]
-    app_metadata: Value,
-    #[serde(rename = "https://your-namespace.com/user_metadata")]
-    user_metadata: Value,
-}
-
 /// Open ID Connect Middleware.
 pub struct OpenIdConnectMiddleware {
     login_path: String,
@@ -79,7 +72,7 @@ pub struct OpenIdConnectMiddleware {
     logout_destroys_session: bool,
     idp_logout_url: Option<String>,
     logout_landing_path: String,
-    client: CoreClient,
+    client: Auto0Client,
     redirect_strategy: Arc<dyn RedirectStrategy>,
 }
 
@@ -113,7 +106,7 @@ impl OpenIdConnectMiddleware {
     /// # Defaults
     ///
     /// The defaults for OpenIdConnectMiddleware are:
-    /// - redirect strategy: [`HttpRedirect`](crate::redirect_strategy::HttpRedirect)
+    /// - redirect strategy: [`HttpRedirect`](HttpRedirect)
     /// - login path: `/login`
     /// - scopes: `["openid"]`
     /// - login landing path: `/`
@@ -338,10 +331,6 @@ impl OpenIdConnectMiddleware {
             let claims: &CoreIdTokenClaims = id_token
                 .claims(&self.client.id_token_verifier(), &nonce)
                 .map_err(|error| tide::http::Error::new(StatusCode::Unauthorized, error))?;
-
-            // Extract Auth0-specific claims
-            let auth0_claims: Auth0Claims = serde_json::from_value(claims.additional_claims().clone())
-                .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
 
             // Add the user id and metadata to the session state in order to mark this
             // session as authenticated.

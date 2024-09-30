@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::redirect_strategy::RedirectStrategy;
@@ -21,6 +22,8 @@ pub trait OpenIdConnectRequestExt {
     /// Gets the Identity Provider-specific user id of the authenticated
     /// user, or `None` if the session has not been authenticated.
     fn user_id(&self) -> Option<String>;
+    fn provider_app_metadata(&self) -> Option<HashMap<String, String>>;
+    fn user_app_metadata(&self) -> Option<HashMap<String, String>>;
 }
 
 impl<State> OpenIdConnectRequestExt for Request<State>
@@ -56,6 +59,14 @@ where
             _ => None,
         }
     }
+
+    fn provider_app_metadata(&self) -> Option<HashMap<String, String>> {
+        todo!()
+    }
+
+    fn user_app_metadata(&self) -> Option<HashMap<String, String>> {
+        todo!()
+    }
 }
 
 pub(crate) enum OpenIdConnectRequestExtData {
@@ -66,6 +77,8 @@ pub(crate) enum OpenIdConnectRequestExtData {
         access_token: String,
         scopes: Vec<String>,
         user_id: String,
+        app_metadata: HashMap<String, String>,
+        user_metadata: HashMap<String, String>,
     },
 }
 
