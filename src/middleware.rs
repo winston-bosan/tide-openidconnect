@@ -4,10 +4,11 @@ use crate::isahc::http_client;
 use crate::redirect_strategy::{HttpRedirect, RedirectStrategy};
 use crate::request_ext::OpenIdConnectRequestExtData;
 use openidconnect::{
-    core::{CoreClient, CoreProviderMetadata, CoreResponseType},
+    core::{CoreClient, CoreProviderMetadata, CoreResponseType, CoreIdTokenClaims},
     AccessToken, AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
     IssuerUrl, Nonce, OAuth2TokenResponse, RedirectUrl, Scope, SubjectIdentifier,
 };
+use serde_json::Value;
 use serde::{Deserialize, Serialize};
 use tide::{http::Method, Middleware, Next, Redirect, Request, StatusCode};
 
@@ -57,7 +58,15 @@ pub struct Config {
 #[derive(Debug, Deserialize, Serialize)]
 enum MiddlewareSessionState {
     PreAuth(CsrfToken, Nonce),
-    PostAuth(SubjectIdentifier, AccessToken, Vec<Scope>),
+    PostAuth(SubjectIdentifier, AccessToken, Vec<Scope>, Value, Value),
+}
+
+#[derive(Debug, Deserialize)]
+struct Auth0Claims {
+    #[serde(rename = "https://your-namespace.com/app_metadata")]
+    app_metadata: Value,
+    #[serde(rename = "https://your-namespace.com/user_metadata")]
+    user_metadata: Value,
 }
 
 /// Open ID Connect Middleware.
@@ -316,7 +325,7 @@ impl OpenIdConnectMiddleware {
             // app_metadata: Data that the user has read-only access to (e.g. roles, permissions, vip, etc)
 
             // Get the claims and verify the nonce.
-            let claims = token_response
+            let id_token = token_response
                 .extra_fields()
                 .id_token()
                 .ok_or_else(|| {
@@ -324,11 +333,17 @@ impl OpenIdConnectMiddleware {
                         StatusCode::InternalServerError,
                         "OpenID Connect server did not return an ID token.",
                     )
-                })?
+                })?;
+
+            let claims: &CoreIdTokenClaims = id_token
                 .claims(&self.client.id_token_verifier(), &nonce)
                 .map_err(|error| tide::http::Error::new(StatusCode::Unauthorized, error))?;
 
-            // Add the user id to the session state in order to mark this
+            // Extract Auth0-specific claims
+            let auth0_claims: Auth0Claims = serde_json::from_value(claims.additional_claims().clone())
+                .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
+
+            // Add the user id and metadata to the session state in order to mark this
             // session as authenticated.
             req.session_mut()
                 .insert(
@@ -337,6 +352,8 @@ impl OpenIdConnectMiddleware {
                         claims.subject().clone(),
                         token_response.access_token().clone(),
                         token_response.scopes().unwrap_or(&self.scopes).clone(),
+                        auth0_claims.app_metadata,
+                        auth0_claims.user_metadata,
                     ),
                 )
                 .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
@@ -399,13 +416,13 @@ where
             // process), then augment the request with the authentication
             // status.
             match req.session().get(SESSION_KEY) {
-                Some(MiddlewareSessionState::PostAuth(subject, access_token, scopes)) => req
+                Some(MiddlewareSessionState::PostAuth(subject, access_token, scopes, app_metadata, user_metadata)) => req
                     .set_ext(OpenIdConnectRequestExtData::Authenticated {
                         user_id: subject.to_string(),
-                        app_metadata: Default::default(),
+                        app_metadata,
                         access_token: access_token.secret().to_string(),
                         scopes: scopes.iter().map(|s| s.to_string()).collect(),
-                        user_metadata: Default::default(),
+                        user_metadata,
                     }),
                 _ => req.set_ext(OpenIdConnectRequestExtData::Unauthenticated {
                     redirect_strategy: self.redirect_strategy.clone(),
