@@ -4,6 +4,7 @@ use crate::claims::{Auth0Claims, Auto0Client};
 use crate::isahc::http_client;
 use crate::redirect_strategy::{HttpRedirect, RedirectStrategy};
 use crate::request_ext::OpenIdConnectRequestExtData;
+use log::{debug, error, info};
 use openidconnect::core::CoreGenderClaim;
 use openidconnect::{
     core::{CoreClient, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType},
@@ -281,6 +282,7 @@ impl OpenIdConnectMiddleware {
     where
         State: Clone + Send + Sync + 'static,
     {
+        info!("Handling callback");
         // Get the middleware state from the session. If this fails then
         // A) the browser got to the callback URL without actually going
         // through the auth process, or B) more likely, the session
@@ -298,7 +300,9 @@ impl OpenIdConnectMiddleware {
                 state: String,
             }
             let callback_data: OpenIdCallback = req.query()?;
+            debug!("Received callback data: {:?}", callback_data);
             if &callback_data.state != csrf_token.secret() {
+                error!("Invalid CSRF state");
                 return Err(tide::http::Error::from_str(
                     StatusCode::Unauthorized,
                     "Invalid CSRF state.",
@@ -306,12 +310,18 @@ impl OpenIdConnectMiddleware {
             }
 
             // Exchange the code for a token.
+            debug!("Exchanging code for token");
             let token_response = self
                 .client
                 .exchange_code(callback_data.code)
                 .request_async(http_client)
                 .await
-                .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
+                .map_err(|error| {
+                    error!("Failed to exchange code for token: {:?}", error);
+                    tide::http::Error::new(StatusCode::InternalServerError, error)
+                })?;
+
+            debug!("Token response received: {:?}", token_response);
 
             // TODO: Something to check for app_metadata and user_metadata
             // Assume auth0 terminology:
@@ -320,19 +330,26 @@ impl OpenIdConnectMiddleware {
 
             // Get the claims and verify the nonce.
             let id_token = token_response.extra_fields().id_token().ok_or_else(|| {
+                error!("OpenID Connect server did not return an ID token");
                 tide::http::Error::from_str(
                     StatusCode::InternalServerError,
                     "OpenID Connect server did not return an ID token.",
                 )
             })?;
 
+            debug!("Verifying ID token claims");
             let claims: &IdTokenClaims<Auth0Claims, CoreGenderClaim> = id_token
                 .claims(&self.client.id_token_verifier(), &nonce)
-                .map_err(|error| tide::http::Error::new(StatusCode::Unauthorized, error))?;
+                .map_err(|error| {
+                    error!("Failed to verify ID token claims: {:?}", error);
+                    tide::http::Error::new(StatusCode::Unauthorized, error)
+                })?;
 
+            debug!("ID token claims: {:?}", claims);
 
             // Add the user id and metadata to the session state in order to mark this
             // session as authenticated.
+            debug!("Setting authenticated session state");
             req.session_mut()
                 .insert(
                     SESSION_KEY,
@@ -343,11 +360,16 @@ impl OpenIdConnectMiddleware {
                         claims.additional_claims().clone(),
                     ),
                 )
-                .map_err(|error| tide::http::Error::new(StatusCode::InternalServerError, error))?;
+                .map_err(|error| {
+                    error!("Failed to insert session state: {:?}", error);
+                    tide::http::Error::new(StatusCode::InternalServerError, error)
+                })?;
 
             // The user has logged in; redirect them to the main site.
+            info!("Authentication successful, redirecting to login landing path");
             Ok(Redirect::new(&self.login_landing_path).into())
         } else {
+            error!("Missing OpenID Connect state in session");
             tide::log::warn!(
                     "Missing OpenID Connect state in session; make sure SessionMiddleware is configured with SameSite::Lax (but do *not* mutate server-side state on GET requests if you make that change!)."
                 );
