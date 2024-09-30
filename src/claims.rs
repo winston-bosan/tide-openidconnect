@@ -12,16 +12,20 @@ impl AdditionalClaims for Auth0Claims {}
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Auth0Claims {
     /// App metadata from Auth0, stored as a JSON Value
-    app_metadata: Value,
-    my_claim: Option<Value>
+    // app_metadata: Value,
+    // my_claim: Option<Value>
+    silly_claim: Value
 }
 
 /// The concrete type the JSON is going to populate/deserialize into
+// #[derive(Debug, Deserialize, Serialize)]
+// pub struct AppMetadata {
+//     /// The Stripe ID linked to the user
+//     pub user_linked_stripe_id: String,
+// }
 #[derive(Debug, Deserialize, Serialize)]
-pub struct AppMetadata {
-    /// The Stripe ID linked to the user
-    pub user_linked_stripe_id: String,
-}
+pub struct AppMetadata(String);
+
 
 impl Auth0Claims {
     /// Deserialize the app_metadata Value into an AppMetadata struct
@@ -29,23 +33,22 @@ impl Auth0Claims {
     /// # Returns
     /// - `Ok(AppMetadata)` if deserialization is successful
     /// - `Err(serde_json::Error)` if deserialization fails
+    // pub fn deserialize_to(&self) -> Result<AppMetadata, serde_json::Error> {
+    //     serde_json::from_value(self.app_metadata.clone())
+    //         .map_err(|e| {
+    //             eprintln!("Failed to deserialize app_metadata: {}", e);
+    //             e
+    //         })
+    // }
+
     pub fn deserialize_to(&self) -> Result<AppMetadata, serde_json::Error> {
-        serde_json::from_value(self.app_metadata.clone())
+        serde_json::from_value(self.silly_claim.clone())
             .map_err(|e| {
                 eprintln!("Failed to deserialize app_metadata: {}", e);
                 e
             })
     }
-}
 
-impl AppMetadata {
-    /// Create a new AppMetadata instance
-    ///
-    /// # Arguments
-    /// * `user_linked_stripe_id` - The Stripe ID linked to the user
-    pub fn new(user_linked_stripe_id: String) -> Self {
-        Self { user_linked_stripe_id }
-    }
 }
 
 /// Custom IdTokenFields type for Auth0
