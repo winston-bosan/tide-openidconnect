@@ -300,7 +300,7 @@ impl OpenIdConnectMiddleware {
                 state: String,
             }
             let callback_data: OpenIdCallback = req.query()?;
-            debug!("Received callback data: {:?}", callback_data);
+            println!("Received callback data: {:?}", callback_data);
             if &callback_data.state != csrf_token.secret() {
                 error!("Invalid CSRF state");
                 return Err(tide::http::Error::from_str(
@@ -310,7 +310,7 @@ impl OpenIdConnectMiddleware {
             }
 
             // Exchange the code for a token.
-            debug!("Exchanging code for token");
+            println!("Exchanging code for token");
             let token_response = self
                 .client
                 .exchange_code(callback_data.code)
@@ -321,7 +321,7 @@ impl OpenIdConnectMiddleware {
                     tide::http::Error::new(StatusCode::InternalServerError, error)
                 })?;
 
-            debug!("Token response received: {:?}", token_response);
+            println!("Token response received: {:?}", token_response);
 
             // TODO: Something to check for app_metadata and user_metadata
             // Assume auth0 terminology:
@@ -337,7 +337,7 @@ impl OpenIdConnectMiddleware {
                 )
             })?;
 
-            debug!("Verifying ID token claims");
+            println!("Verifying ID token claims");
             let claims: &IdTokenClaims<Auth0Claims, CoreGenderClaim> = id_token
                 .claims(&self.client.id_token_verifier(), &nonce)
                 .map_err(|error| {
@@ -345,11 +345,11 @@ impl OpenIdConnectMiddleware {
                     tide::http::Error::new(StatusCode::Unauthorized, error)
                 })?;
 
-            debug!("ID token claims: {:?}", claims);
+            println!("ID token claims: {:?}", claims);
 
             // Add the user id and metadata to the session state in order to mark this
             // session as authenticated.
-            debug!("Setting authenticated session state");
+            println!("Setting authenticated session state");
             req.session_mut()
                 .insert(
                     SESSION_KEY,
