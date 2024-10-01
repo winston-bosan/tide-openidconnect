@@ -20,7 +20,6 @@ pub struct Auth0Claims {
 /// The concrete type the JSON is going to populate/deserialize into
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AllMetadata {
-    /// The Stripe ID linked to the user
     pub app_metadata: AppMetadata,
     pub silly_claims: String
 }
@@ -47,7 +46,7 @@ impl Auth0Claims {
     // }
 
     pub fn deserialize_to(&self) -> Result<AllMetadata, serde_json::Error> {
-        let app_metadata = serde_json::from_value(self.app_metadata.clone())
+        let app_metadata = serde_json::from_str(self.app_metadata.clone().as_str().unwrap())
             .map_err(|e| {
                 eprintln!("Failed to deserialize app_metadata: {}", e);
                 e
